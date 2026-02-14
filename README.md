@@ -1,4 +1,4 @@
-# d3chat
+# d3chat v1.0.0
 
 A federated, end-to-end encrypted chat application. Signal-like trust model — server operators cannot read message content.
 
