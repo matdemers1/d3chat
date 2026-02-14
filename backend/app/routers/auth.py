@@ -1,0 +1,147 @@
+import secrets
+import uuid
+from datetime import datetime, timedelta, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select, delete
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config import get_settings
+from app.crypto.passwords import hash_password, verify_password
+from app.crypto.tokens import create_access_token, create_refresh_token, hash_refresh_token
+from app.database import get_db
+from app.dependencies import get_current_user
+from app.models.device import Device
+from app.models.session import Session
+from app.models.user import User
+from app.redis_client import get_redis
+from app.schemas.auth import (
+    LoginRequest,
+    RefreshRequest,
+    RegisterRequest,
+    TokenResponse,
+    WsTicketResponse,
+)
+
+router = APIRouter()
+settings = get_settings()
+
+
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(User).where(User.username == body.username, User.server_domain == settings.server_domain)
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
+
+    user = User(
+        username=body.username,
+        email=body.email,
+        password_hash=hash_password(body.password),
+        server_domain=settings.server_domain,
+        is_local=True,
+    )
+    db.add(user)
+    await db.flush()
+
+    device = Device(user_id=user.id, device_name=body.device_name)
+    db.add(device)
+    await db.flush()
+
+    refresh_token = create_refresh_token()
+    session = Session(
+        user_id=user.id,
+        device_id=device.id,
+        refresh_token_hash=hash_refresh_token(refresh_token),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days),
+    )
+    db.add(session)
+
+    access_token = create_access_token({"sub": str(user.id)})
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user_id=user.id,
+        device_id=device.id,
+    )
+
+
+@router.post("/login", response_model=TokenResponse)
+async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(User).where(User.username == body.username, User.server_domain == settings.server_domain)
+    )
+    user = result.scalar_one_or_none()
+    if not user or not user.password_hash or not verify_password(body.password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+
+    device = Device(user_id=user.id, device_name=body.device_name)
+    db.add(device)
+    await db.flush()
+
+    refresh_token = create_refresh_token()
+    session = Session(
+        user_id=user.id,
+        device_id=device.id,
+        refresh_token_hash=hash_refresh_token(refresh_token),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days),
+    )
+    db.add(session)
+
+    access_token = create_access_token({"sub": str(user.id)})
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user_id=user.id,
+        device_id=device.id,
+    )
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    token_hash = hash_refresh_token(body.refresh_token)
+    result = await db.execute(
+        select(Session).where(
+            Session.refresh_token_hash == token_hash,
+            Session.expires_at > datetime.now(timezone.utc),
+        )
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+
+    # Rotate refresh token
+    new_refresh = create_refresh_token()
+    session.refresh_token_hash = hash_refresh_token(new_refresh)
+    session.expires_at = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)
+
+    access_token = create_access_token({"sub": str(session.user_id)})
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=new_refresh,
+        user_id=session.user_id,
+        device_id=session.device_id or uuid.uuid4(),
+    )
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    token_hash = hash_refresh_token(body.refresh_token)
+    await db.execute(delete(Session).where(Session.refresh_token_hash == token_hash))
+
+
+@router.post("/logout-all", status_code=status.HTTP_204_NO_CONTENT)
+async def logout_all(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await db.execute(delete(Session).where(Session.user_id == user.id))
+
+
+@router.post("/ws-ticket", response_model=WsTicketResponse)
+async def ws_ticket(user: User = Depends(get_current_user)):
+    redis = await get_redis()
+    ticket = secrets.token_urlsafe(32)
+    await redis.setex(f"ws_ticket:{ticket}", 30, str(user.id))
+    return WsTicketResponse(ticket=ticket)
