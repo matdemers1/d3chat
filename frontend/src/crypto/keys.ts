@@ -36,10 +36,10 @@ export async function exportPublicKey(key: CryptoKey): Promise<string> {
 export async function importECDHPublicKey(
   base64: string
 ): Promise<CryptoKey> {
-  const raw = new Uint8Array(base64ToArrayBuffer(base64) as ArrayBufferLike);
+  const raw = new Uint8Array(base64ToArrayBuffer(base64));
   return crypto.subtle.importKey(
     "raw",
-    raw,
+    raw.buffer as ArrayBuffer,
     { name: "ECDH", namedCurve: "P-256" },
     true,
     []
@@ -49,10 +49,10 @@ export async function importECDHPublicKey(
 export async function importECDSAPublicKey(
   base64: string
 ): Promise<CryptoKey> {
-  const raw = new Uint8Array(base64ToArrayBuffer(base64) as ArrayBufferLike);
+  const raw = new Uint8Array(base64ToArrayBuffer(base64));
   return crypto.subtle.importKey(
     "raw",
-    raw,
+    raw.buffer as ArrayBuffer,
     { name: "ECDSA", namedCurve: "P-256" },
     true,
     ["verify"]

@@ -10,7 +10,7 @@ export async function deriveAESKey(
   // Import the shared secret as HKDF key material
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
-    new Uint8Array(sharedSecret as ArrayBufferLike),
+    new Uint8Array(sharedSecret as ArrayBuffer),
     "HKDF",
     false,
     ["deriveKey"]
@@ -20,7 +20,7 @@ export async function deriveAESKey(
     {
       name: "HKDF",
       hash: "SHA-256",
-      salt: salt ? new Uint8Array(salt as ArrayBufferLike) : new Uint8Array(32),
+      salt: salt ? new Uint8Array(salt as ArrayBuffer) : new Uint8Array(32),
       info: encoder.encode(info),
     },
     keyMaterial,

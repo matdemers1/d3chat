@@ -37,7 +37,7 @@ export async function ratchetChainKey(chainKey: ArrayBuffer): Promise<{
   // Import chain key as HMAC key
   const hmacKey = await crypto.subtle.importKey(
     "raw",
-    new Uint8Array(chainKey as ArrayBufferLike),
+    chainKey as ArrayBuffer,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"]
