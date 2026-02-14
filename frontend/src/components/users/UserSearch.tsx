@@ -8,7 +8,7 @@ interface Props {
 
 function isFederatedIdentity(q: string): boolean {
   const parts = q.split("@");
-  return parts.length === 2 && parts[0].length > 0 && parts[1].length > 0;
+  return parts.length === 2 && (parts[0]?.length ?? 0) > 0 && (parts[1]?.length ?? 0) > 0;
 }
 
 export default function UserSearch({ onSelect }: Props) {
