@@ -39,10 +39,10 @@ services:
       DATABASE_URL: postgresql+asyncpg://d3chat:${POSTGRES_PASSWORD}@postgres:5432/d3chat
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: ${SECRET_KEY}
-      SERVER_DOMAIN: chat.d3cloudd.io
-      API_BASE_URL: https://chat.d3cloudd.io
+      SERVER_DOMAIN: chat.d3cloud.io
+      API_BASE_URL: https://chat.d3cloud.io
       SIGNING_KEY_SEED: ${SIGNING_KEY_SEED}
-      CORS_ORIGINS: '["https://chat.d3cloudd.io"]'
+      CORS_ORIGINS: '["https://chat.d3cloud.io"]'
     depends_on:
       postgres:
         condition: service_healthy
@@ -54,8 +54,8 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: https://chat.d3cloudd.io/api/v1
-        VITE_WS_URL: wss://chat.d3cloudd.io/ws
+        VITE_API_URL: https://chat.d3cloud.io/api/v1
+        VITE_WS_URL: wss://chat.d3cloud.io/ws
     depends_on:
       - backend
     restart: unless-stopped
