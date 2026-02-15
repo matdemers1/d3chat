@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useAdminStore } from "@/store/adminStore";
+import type { AnalyticsDayPoint } from "@/types";
 
 function StatCard({ label, value }: { label: string; value: number | string }) {
   return (
@@ -16,8 +17,8 @@ function BarChart({
   label,
   color,
 }: {
-  data: { date: string; [key: string]: unknown }[];
-  dataKey: string;
+  data: AnalyticsDayPoint[];
+  dataKey: keyof AnalyticsDayPoint;
   label: string;
   color: string;
 }) {
@@ -28,22 +29,25 @@ function BarChart({
     <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
       <p className="text-sm text-gray-400 mb-3">{label}</p>
       <div className="flex items-end gap-[2px] h-24">
-        {data.map((d, i) => (
-          <div
-            key={d.date}
-            className="flex-1 rounded-t transition-all"
-            style={{
-              height: `${(values[i] / max) * 100}%`,
-              backgroundColor: color,
-              minHeight: values[i] > 0 ? "2px" : "0px",
-            }}
-            title={`${d.date}: ${values[i]}`}
-          />
-        ))}
+        {data.map((d, i) => {
+          const v = values[i] ?? 0;
+          return (
+            <div
+              key={d.date}
+              className="flex-1 rounded-t transition-all"
+              style={{
+                height: `${(v / max) * 100}%`,
+                backgroundColor: color,
+                minHeight: v > 0 ? "2px" : "0px",
+              }}
+              title={`${d.date}: ${v}`}
+            />
+          );
+        })}
       </div>
       <div className="flex justify-between mt-1">
-        <span className="text-[10px] text-gray-600">{data[0]?.date?.slice(5)}</span>
-        <span className="text-[10px] text-gray-600">{data[data.length - 1]?.date?.slice(5)}</span>
+        <span className="text-[10px] text-gray-600">{data[0]?.date.slice(5)}</span>
+        <span className="text-[10px] text-gray-600">{data[data.length - 1]?.date.slice(5)}</span>
       </div>
     </div>
   );
