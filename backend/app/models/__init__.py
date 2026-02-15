@@ -7,6 +7,9 @@ from app.models.message import Message
 from app.models.key import DeviceKey
 from app.models.sender_key import SenderKey
 from app.models.session import Session
+from app.models.audit_log import AuditLog
+from app.models.server_settings import ServerSettings
+from app.models.analytics import AnalyticsDaily
 
 __all__ = [
     "User",
@@ -18,4 +21,7 @@ __all__ = [
     "DeviceKey",
     "SenderKey",
     "Session",
+    "AuditLog",
+    "ServerSettings",
+    "AnalyticsDaily",
 ]

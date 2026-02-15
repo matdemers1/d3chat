@@ -16,6 +16,8 @@ interface ChatState {
   members: Record<string, ChannelMember[]>;
   hasMore: Record<string, boolean>;
   typingUsers: Record<string, Set<string>>;
+  error: string | null;
+  clearError: () => void;
   loadChannels: () => Promise<void>;
   setActiveChannel: (id: string) => void;
   loadMessages: (channelId: string) => Promise<void>;
@@ -55,11 +57,18 @@ async function decryptMessage(
 ): Promise<Message> {
   if (msg.protocol_version !== 2 || !channel) return msg;
 
-  // Check plaintext cache first (handles re-decryption after page reload)
+  // Check plaintext cache first (handles re-decryption after page reload,
+  // and is required for own messages where the sender key has already ratcheted)
   const cached = await getCachedPlaintext(msg.id);
   if (cached !== undefined) {
     return { ...msg, content: cached };
   }
+
+  // For own messages in sender_keys channels, the local chain key has already
+  // ratcheted past this message number during encrypt, so decryption will fail.
+  // If we don't have a cache hit, show a softer indicator.
+  const deviceId = localStorage.getItem("device_id");
+  const isOwnMessage = msg.sender_device_id === deviceId;
 
   try {
     const plaintext = await decryptFromChannel(
@@ -72,6 +81,9 @@ async function decryptMessage(
     await cacheMessagePlaintext(msg.id, plaintext);
     return { ...msg, content: plaintext };
   } catch {
+    if (isOwnMessage) {
+      return { ...msg, content: "[Your message - cache expired]" };
+    }
     return { ...msg, content: "[Unable to decrypt]" };
   }
 }
@@ -95,6 +107,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   members: {},
   hasMore: {},
   typingUsers: {},
+  error: null,
+  clearError: () => set({ error: null }),
 
   loadChannels: async () => {
     const channels = await api.get<Channel[]>("/channels");
@@ -184,15 +198,31 @@ export const useChatStore = create<ChatState>((set, get) => ({
         get().addMessage({ ...msg, content });
         return;
       } catch (err) {
-        console.error("Encryption failed, sending plaintext:", err);
+        const message = err instanceof Error ? err.message : "Send failed";
+        if (message.includes("429") || message.includes("Rate limit")) {
+          set({ error: "Rate limit reached. Wait a moment and try again." });
+        } else {
+          console.error("Encryption failed, trying plaintext:", err);
+          // Fall through to plaintext fallback
+        }
+        if (message.includes("429") || message.includes("Rate limit")) return;
       }
     }
 
     // Fallback: send plaintext
-    const msg = await api.post<Message>(`/channels/${channelId}/messages`, {
-      content,
-    });
-    get().addMessage(msg);
+    try {
+      const msg = await api.post<Message>(`/channels/${channelId}/messages`, {
+        content,
+      });
+      get().addMessage(msg);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Send failed";
+      if (message.includes("429") || message.includes("Rate limit")) {
+        set({ error: "Rate limit reached. Wait a moment and try again." });
+      } else {
+        set({ error: `Failed to send message: ${message}` });
+      }
+    }
   },
 
   createChannel: async (name) => {

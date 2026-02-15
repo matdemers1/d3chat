@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 
     # Rate limiting
-    rate_limit_per_minute: int = 60
+    rate_limit_per_minute: int = 300
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

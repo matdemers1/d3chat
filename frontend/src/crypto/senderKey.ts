@@ -144,10 +144,13 @@ export async function decryptWithSenderKey(
     }
   }
 
-  // If we're already past this message number, we can't decrypt (ratchet is one-way)
+  // If we're already past this message number, we can't decrypt (ratchet is one-way).
+  // This typically happens with our own messages — the encrypt already ratcheted
+  // the chain key past this point. The plaintext cache should cover this case.
   if (stored.messageNumber >= targetMessageNumber) {
     throw new Error(
-      `Already past message ${targetMessageNumber} (at ${stored.messageNumber})`
+      `Already ratcheted past message ${targetMessageNumber} (at ${stored.messageNumber}). ` +
+      `This is expected for own messages — plaintext should be cached.`
     );
   }
 

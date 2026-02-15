@@ -9,6 +9,7 @@ class UserResponse(BaseModel):
     email: str | None = None
     server_domain: str
     is_local: bool
+    role: str = "user"
     created_at: datetime
 
     model_config = {"from_attributes": True}

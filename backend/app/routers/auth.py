@@ -76,6 +76,20 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     if not user or not user.password_hash or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
+    # Check ban/suspension
+    if user.is_banned:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account has been banned")
+    if user.is_suspended:
+        if user.suspended_until and user.suspended_until > datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Account suspended until {user.suspended_until.isoformat()}",
+            )
+        else:
+            # Auto-unsuspend if suspension expired
+            user.is_suspended = False
+            user.suspended_until = None
+
     device = Device(user_id=user.id, device_name=body.device_name)
     db.add(device)
     await db.flush()

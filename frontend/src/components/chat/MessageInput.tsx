@@ -8,13 +8,23 @@ interface Props {
 
 export default function MessageInput({ channelId }: Props) {
   const [content, setContent] = useState("");
+  const [sending, setSending] = useState(false);
   const sendMessage = useChatStore((s) => s.sendMessage);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!content.trim()) return;
-    await sendMessage(channelId, content.trim());
+    if (!content.trim() || sending) return;
+    const text = content.trim();
     setContent("");
+    setSending(true);
+    try {
+      await sendMessage(channelId, text);
+    } catch {
+      // Error is surfaced via chatStore.error / toast
+      setContent(text); // Restore content so user can retry
+    } finally {
+      setSending(false);
+    }
     wsClient.send({ type: "typing.stop", channel_id: channelId });
   };
 
@@ -47,13 +57,14 @@ export default function MessageInput({ channelId }: Props) {
           onKeyDown={handleKeyDown}
           placeholder="Type a message..."
           className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+          disabled={sending}
         />
         <button
           type="submit"
-          disabled={!content.trim()}
+          disabled={!content.trim() || sending}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 text-white rounded-lg transition-colors"
         >
-          Send
+          {sending ? "..." : "Send"}
         </button>
       </div>
     </form>

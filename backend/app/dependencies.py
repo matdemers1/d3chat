@@ -36,3 +36,19 @@ async def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
     return user
+
+
+async def get_admin_user(
+    user: User = Depends(get_current_user),
+) -> User:
+    if user.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    return user
+
+
+async def get_superadmin_user(
+    user: User = Depends(get_current_user),
+) -> User:
+    if user.role != "superadmin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Superadmin access required")
+    return user

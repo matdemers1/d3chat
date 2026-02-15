@@ -18,6 +18,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         if path.startswith("/federation/") or path.startswith("/.well-known/"):
             return await call_next(request)
+        # Skip CORS preflight requests — they don't hit business logic
+        if request.method == "OPTIONS":
+            return await call_next(request)
 
         # Use IP-based rate limiting for unauthenticated requests
         client_ip = request.client.host if request.client else "unknown"
@@ -32,6 +35,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 return JSONResponse(
                     status_code=429,
                     content={"detail": "Rate limit exceeded"},
+                    headers={"Retry-After": "10"},
                 )
         except Exception:
             # If Redis is down, allow the request through

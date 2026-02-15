@@ -7,6 +7,32 @@ import MessageInput from "@/components/chat/MessageInput";
 import ChannelHeader from "@/components/chat/ChannelHeader";
 import { useUiStore } from "@/store/uiStore";
 
+function ErrorToast() {
+  const error = useChatStore((s) => s.error);
+  const clearError = useChatStore((s) => s.clearError);
+
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(clearError, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error, clearError]);
+
+  if (!error) return null;
+
+  return (
+    <div className="fixed bottom-4 right-4 z-50 max-w-sm bg-red-900 border border-red-700 text-white px-4 py-3 rounded-lg shadow-lg flex items-start gap-2">
+      <span className="flex-1 text-sm">{error}</span>
+      <button
+        onClick={clearError}
+        className="text-red-300 hover:text-white shrink-0"
+      >
+        &times;
+      </button>
+    </div>
+  );
+}
+
 export default function ChatPage() {
   const loadChannels = useChatStore((s) => s.loadChannels);
   const activeChannelId = useChatStore((s) => s.activeChannelId);
@@ -37,6 +63,7 @@ export default function ChatPage() {
           </div>
         )}
       </div>
+      <ErrorToast />
     </div>
   );
 }
