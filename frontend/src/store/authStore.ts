@@ -23,6 +23,10 @@ interface AuthState {
   logout: () => void;
   loadUser: () => Promise<void>;
   restoreSession: () => void;
+  updateProfile: (updates: Partial<Pick<User, "display_name" | "bio" | "status_message" | "email" | "email_visible" | "preferences">>) => Promise<void>;
+  changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
+  uploadAvatar: (file: File) => Promise<void>;
+  deleteAvatar: () => Promise<void>;
 }
 
 // Restore tokens synchronously so the first render knows auth state
@@ -139,5 +143,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       wsClient.connect();
     }
+  },
+
+  updateProfile: async (updates) => {
+    const user = await api.patch<User>("/users/me", updates);
+    set({ user });
+  },
+
+  changePassword: async (oldPassword, newPassword) => {
+    await api.post("/users/me/password", {
+      old_password: oldPassword,
+      new_password: newPassword,
+    });
+  },
+
+  uploadAvatar: async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const user = await api.upload<User>("/users/me/avatar", formData);
+    set({ user });
+  },
+
+  deleteAvatar: async () => {
+    const user = await api.delete<User>("/users/me/avatar");
+    set({ user });
   },
 }));

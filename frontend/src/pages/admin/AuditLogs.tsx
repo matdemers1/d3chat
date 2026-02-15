@@ -49,7 +49,7 @@ export default function AuditLogs() {
             <option key={a} value={a}>{a.replace(/_/g, " ")}</option>
           ))}
         </select>
-        <button onClick={handleFilter} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-sm">
+        <button onClick={handleFilter} className="px-4 py-1.5 bg-brand hover:brightness-90 rounded text-sm">
           Filter
         </button>
       </div>

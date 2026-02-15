@@ -1,13 +1,16 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.ext.asyncio import AsyncSession
+
+import json
 
 from app.config import get_settings
 from app.redis_client import redis_client
-from app.database import get_engine, get_session_factory
-from app.routers import admin, auth, users, devices, channels, messages, keys
+from app.database import get_db, get_engine, get_session_factory
+from app.routers import admin, auth, users, devices, channels, messages, keys, avatars
 from app.websocket.router import router as ws_router
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.federation.identity import init_server_identity, get_public_key_b64
@@ -82,6 +85,10 @@ async def lifespan(app: FastAPI):
         await init_server_identity(session)
     async with factory() as session:
         await ensure_default_admin(session)
+    # Ensure uploads directory exists
+    import os
+    settings = get_settings()
+    os.makedirs(os.path.join(settings.upload_dir, "avatars"), exist_ok=True)
     yield
     # Shutdown
     logger.info(f"d3chat backend v{APP_VERSION} shutting down")
@@ -122,6 +129,7 @@ def create_app() -> FastAPI:
     app.include_router(messages.router, prefix="/api/v1/channels", tags=["messages"])
     app.include_router(keys.router, prefix="/api/v1/keys", tags=["keys"])
     app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
+    app.include_router(avatars.router, prefix="/api/v1/avatars", tags=["avatars"])
 
     # WebSocket
     app.include_router(ws_router)
@@ -133,6 +141,54 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health():
         return {"status": "ok"}
+
+    @app.get("/api/v1/config")
+    async def public_config(db: AsyncSession = Depends(get_db)):
+        from sqlalchemy import select
+        from app.models.server_settings import ServerSettings
+        from app.schemas.admin import PublicConfigResponse
+
+        # Try Redis cache first
+        cache_key = "public_config"
+        try:
+            cached = await redis_client.get(cache_key)
+            if cached:
+                return PublicConfigResponse(**json.loads(cached))
+        except Exception:
+            pass
+
+        # Query settings from DB
+        public_keys = [
+            "app_name", "app_description", "registration_mode",
+            "brand_primary_color", "brand_accent_color",
+        ]
+        result = await db.execute(
+            select(ServerSettings).where(ServerSettings.key.in_(public_keys))
+        )
+        settings_rows = result.scalars().all()
+        settings_map = {s.key: s.value for s in settings_rows}
+
+        def get_val(key: str, default: str) -> str:
+            val = settings_map.get(key)
+            if val and isinstance(val, dict) and "value" in val:
+                return str(val["value"])
+            return default
+
+        config = PublicConfigResponse(
+            app_name=get_val("app_name", "d3chat"),
+            app_description=get_val("app_description", "Federated end-to-end encrypted chat"),
+            registration_mode=get_val("registration_mode", "open"),
+            brand_primary_color=get_val("brand_primary_color", "#3b82f6"),
+            brand_accent_color=get_val("brand_accent_color", "#10b981"),
+        )
+
+        # Cache for 60 seconds
+        try:
+            await redis_client.setex(cache_key, 60, json.dumps(config.model_dump()))
+        except Exception:
+            pass
+
+        return config
 
     @app.get("/.well-known/d3chat-server")
     async def well_known():

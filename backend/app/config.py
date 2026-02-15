@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     # CORS
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 
+    # Uploads
+    upload_dir: str = "uploads"
+    max_avatar_size_bytes: int = 2_097_152  # 2 MB
+
     # Rate limiting
     rate_limit_per_minute: int = 300
 

@@ -157,6 +157,8 @@ async def list_members(
             is_local=m.user.is_local,
             role=m.role,
             joined_at=m.joined_at,
+            display_name=m.user.display_name,
+            avatar_url=f"/api/v1/avatars/{m.user_id}" if m.user.avatar_path else None,
         )
         for m in members
     ]
@@ -228,6 +230,8 @@ async def add_member(
         is_local=target.is_local,
         role="member",
         joined_at=member.joined_at,
+        display_name=target.display_name,
+        avatar_url=f"/api/v1/avatars/{target.id}" if target.avatar_path else None,
     )
 
 

@@ -139,7 +139,7 @@ export default function Users() {
           <option value="banned">Banned</option>
           <option value="suspended">Suspended</option>
         </select>
-        <button onClick={handleSearch} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-sm">
+        <button onClick={handleSearch} className="px-4 py-1.5 bg-brand hover:brightness-90 rounded text-sm">
           Search
         </button>
       </div>

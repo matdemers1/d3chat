@@ -27,7 +27,7 @@ export default function AdminLayout() {
               className={({ isActive }) =>
                 `block px-3 py-2 rounded text-sm transition-colors ${
                   isActive
-                    ? "bg-blue-600 text-white"
+                    ? "bg-brand text-white"
                     : "text-gray-400 hover:bg-gray-800 hover:text-white"
                 }`
               }

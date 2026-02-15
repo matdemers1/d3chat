@@ -46,7 +46,7 @@ export default function Channels() {
           <option value="channel">Channels</option>
           <option value="dm">DMs</option>
         </select>
-        <button onClick={handleSearch} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-sm">
+        <button onClick={handleSearch} className="px-4 py-1.5 bg-brand hover:brightness-90 rounded text-sm">
           Search
         </button>
       </div>

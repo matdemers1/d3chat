@@ -12,6 +12,7 @@ from app.crypto.tokens import create_access_token, create_refresh_token, hash_re
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.device import Device
+from app.models.server_settings import ServerSettings
 from app.models.session import Session
 from app.models.user import User
 from app.redis_client import get_redis
@@ -29,6 +30,36 @@ settings = get_settings()
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+    # Check registration mode
+    reg_mode_result = await db.execute(
+        select(ServerSettings).where(ServerSettings.key == "registration_mode")
+    )
+    reg_mode_setting = reg_mode_result.scalar_one_or_none()
+    reg_mode = "open"
+    if reg_mode_setting and reg_mode_setting.value and "value" in reg_mode_setting.value:
+        reg_mode = reg_mode_setting.value["value"]
+
+    if reg_mode == "closed":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Registration is currently closed")
+    if reg_mode == "invite_only":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Registration is invite-only")
+
+    # Check domain allowlist
+    if body.email:
+        allowlist_result = await db.execute(
+            select(ServerSettings).where(ServerSettings.key == "registration_domain_allowlist")
+        )
+        allowlist_setting = allowlist_result.scalar_one_or_none()
+        if allowlist_setting and allowlist_setting.value and "value" in allowlist_setting.value:
+            allowed_domains = allowlist_setting.value["value"]
+            if isinstance(allowed_domains, list) and len(allowed_domains) > 0:
+                email_domain = body.email.rsplit("@", 1)[-1].lower()
+                if email_domain not in [d.lower() for d in allowed_domains]:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Email domain '{email_domain}' is not allowed for registration",
+                    )
+
     result = await db.execute(
         select(User).where(User.username == body.username, User.server_domain == settings.server_domain)
     )

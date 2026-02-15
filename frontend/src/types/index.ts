@@ -1,3 +1,8 @@
+export interface UserPreferences {
+  desktop_notifications?: boolean;
+  notification_sound?: boolean;
+}
+
 export interface User {
   id: string;
   username: string;
@@ -5,6 +10,26 @@ export interface User {
   server_domain: string;
   is_local: boolean;
   role: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  status_message: string | null;
+  email_visible: boolean;
+  preferences: UserPreferences;
+  created_at: string;
+}
+
+export interface PublicUser {
+  id: string;
+  username: string;
+  email: string | null;
+  server_domain: string;
+  is_local: boolean;
+  role: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  status_message: string | null;
   created_at: string;
 }
 
@@ -50,6 +75,8 @@ export interface ChannelMember {
   is_local: boolean;
   role: string;
   joined_at: string;
+  display_name: string | null;
+  avatar_url: string | null;
 }
 
 export interface TokenResponse {
@@ -155,4 +182,12 @@ export interface PaginatedResponse<T> {
   page: number;
   page_size: number;
   items: T[];
+}
+
+export interface PublicConfig {
+  app_name: string;
+  app_description: string;
+  registration_mode: string;
+  brand_primary_color: string;
+  brand_accent_color: string;
 }

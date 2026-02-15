@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
+import { useBrandingStore } from "@/store/brandingStore";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -8,6 +9,8 @@ export default function LoginPage() {
   const login = useAuthStore((s) => s.login);
   const error = useAuthStore((s) => s.error);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const appName = useBrandingStore((s) => s.appName);
+  const appDescription = useBrandingStore((s) => s.appDescription);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: FormEvent) => {
@@ -23,9 +26,10 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-950">
       <div className="w-full max-w-md p-8 bg-gray-900 rounded-xl shadow-lg">
-        <h1 className="text-2xl font-bold text-white mb-6 text-center">
-          Sign in to d3chat
+        <h1 className="text-2xl font-bold text-white mb-2 text-center">
+          Sign in to {appName}
         </h1>
+        <p className="text-sm text-gray-400 text-center mb-6">{appDescription}</p>
         {error && (
           <div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded text-red-200 text-sm">
             {error}
@@ -59,14 +63,14 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded font-medium transition-colors"
+            className="w-full py-2 bg-brand hover:brightness-90 disabled:opacity-50 text-white rounded font-medium transition-colors"
           >
             {isLoading ? "Signing in..." : "Sign In"}
           </button>
         </form>
         <p className="mt-4 text-center text-sm text-gray-500">
           Don't have an account?{" "}
-          <Link to="/register" className="text-blue-400 hover:underline">
+          <Link to="/register" className="text-brand hover:underline">
             Register
           </Link>
         </p>

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
+import { useBrandingStore } from "@/store/brandingStore";
 import { api } from "@/api/client";
 import LoginPage from "@/pages/Login";
 import RegisterPage from "@/pages/Register";
@@ -31,11 +32,13 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   const restoreSession = useAuthStore((s) => s.restoreSession);
   const logout = useAuthStore((s) => s.logout);
+  const loadConfig = useBrandingStore((s) => s.loadConfig);
 
   useEffect(() => {
     api.setOnUnauthorized(logout);
     restoreSession();
-  }, [restoreSession, logout]);
+    loadConfig();
+  }, [restoreSession, logout, loadConfig]);
 
   return (
     <Routes>

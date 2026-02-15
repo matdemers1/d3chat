@@ -1,6 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useChatStore } from "@/store/chatStore";
 import { useAuthStore } from "@/store/authStore";
+import Avatar from "@/components/common/Avatar";
+import UserProfileCard from "@/components/users/UserProfileCard";
 import type { ChannelMember } from "@/types";
 
 interface Props {
@@ -17,10 +19,24 @@ function getSenderDisplay(
   if (!members) return senderId.slice(0, 8);
   const member = members.find((m) => m.user_id === senderId);
   if (!member) return senderId.slice(0, 8);
+  if (member.display_name) return member.display_name;
   if (!member.is_local) {
     return `${member.username}@${member.server_domain}`;
   }
   return member.username;
+}
+
+function getSenderAvatar(
+  senderId: string | null,
+  members: ChannelMember[] | undefined
+): { src: string | null; name: string } {
+  if (!senderId || !members) return { src: null, name: "?" };
+  const member = members.find((m) => m.user_id === senderId);
+  if (!member) return { src: null, name: senderId.slice(0, 2) };
+  return {
+    src: member.avatar_url ?? null,
+    name: member.display_name || member.username,
+  };
 }
 
 export default function MessageList({ channelId }: Props) {
@@ -31,6 +47,7 @@ export default function MessageList({ channelId }: Props) {
   const loadMembers = useChatStore((s) => s.loadMembers);
   const user = useAuthStore((s) => s.user);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -62,21 +79,36 @@ export default function MessageList({ channelId }: Props) {
         const isOwn = msg.sender_id === user?.id;
         const isEncrypted = msg.protocol_version === 2;
         const isDecryptionFailure = msg.content === "[Unable to decrypt]";
+        const senderName = getSenderDisplay(msg.sender_id, members);
+        const avatar = getSenderAvatar(msg.sender_id, members);
         return (
           <div key={msg.id} className={`flex mb-3 ${isOwn ? "justify-end" : ""}`}>
+            {!isOwn && (
+              <div className="mr-2 mt-1 shrink-0">
+                <Avatar
+                  src={avatar.src}
+                  name={avatar.name}
+                  size="sm"
+                  onClick={msg.sender_id ? () => setProfileUserId(msg.sender_id) : undefined}
+                />
+              </div>
+            )}
             <div
               className={`max-w-[70%] px-3 py-2 rounded-lg ${
                 isDecryptionFailure
                   ? "bg-red-900/30 text-red-300 border border-red-800"
                   : isOwn
-                    ? "bg-blue-600 text-white"
+                    ? "bg-brand text-white"
                     : "bg-gray-800 text-gray-100"
               }`}
             >
               {!isOwn && (
-                <div className="text-xs text-gray-400 mb-1">
-                  {getSenderDisplay(msg.sender_id, members)}
-                </div>
+                <button
+                  className="text-xs text-gray-400 mb-1 hover:text-white transition-colors text-left"
+                  onClick={() => msg.sender_id && setProfileUserId(msg.sender_id)}
+                >
+                  {senderName}
+                </button>
               )}
               <p className="text-sm break-words">
                 {isDecryptionFailure ? (
@@ -114,6 +146,12 @@ export default function MessageList({ channelId }: Props) {
         );
       })}
       <div ref={bottomRef} />
+      {profileUserId && (
+        <UserProfileCard
+          userId={profileUserId}
+          onClose={() => setProfileUserId(null)}
+        />
+      )}
     </div>
   );
 }

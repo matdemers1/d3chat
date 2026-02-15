@@ -54,6 +54,7 @@ interface AdminState {
   deleteChannel: (id: string) => Promise<void>;
   fetchAuditLogs: (params?: { page?: number; action?: string }) => Promise<void>;
   fetchSettings: () => Promise<void>;
+  updateSetting: (key: string, value: unknown, description?: string) => Promise<void>;
   clearSelectedUser: () => void;
 }
 
@@ -196,6 +197,20 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     } finally {
       set({ loadingSettings: false });
     }
+  },
+
+  updateSetting: async (key, value, description) => {
+    const body: { value: { value: unknown }; description?: string } = {
+      value: { value },
+    };
+    if (description !== undefined) {
+      body.description = description;
+    }
+    const updated = await api.put<ServerSetting>(`/admin/settings/${key}`, body);
+    // Update the single setting in-place to avoid a loading flash from refetch
+    set({
+      settings: get().settings.map((s) => (s.key === key ? updated : s)),
+    });
   },
 
   clearSelectedUser: () => set({ selectedUser: null }),

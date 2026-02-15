@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_admin_user, get_superadmin_user
+from app.redis_client import redis_client
 from app.models.user import User
 from app.models.channel import Channel
 from app.models.membership import ChannelMember
@@ -33,6 +34,7 @@ from app.schemas.admin import (
     AuditLogListResponse,
     ServerSettingResponse,
     ServerSettingUpdate,
+    ServerSettingCreate,
 )
 
 router = APIRouter()
@@ -595,6 +597,41 @@ async def update_setting(
     await log_action(
         db, admin, "update_setting", "setting", key,
         {"old_value": old_value, "new_value": body.value}, get_client_ip(request),
+    )
+
+    # Invalidate public config cache so changes take effect immediately
+    try:
+        await redis_client.delete("public_config")
+    except Exception:
+        pass
+
+    return ServerSettingResponse.model_validate(setting)
+
+
+@router.post("/settings", response_model=ServerSettingResponse, status_code=status.HTTP_201_CREATED)
+async def create_setting(
+    body: ServerSettingCreate,
+    request: Request,
+    admin: User = Depends(get_superadmin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(ServerSettings).where(ServerSettings.key == body.key))
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Setting already exists")
+
+    setting = ServerSettings(
+        key=body.key,
+        value=body.value,
+        category=body.category,
+        description=body.description,
+        updated_by=admin.id,
+    )
+    db.add(setting)
+    await db.flush()
+
+    await log_action(
+        db, admin, "create_setting", "setting", body.key,
+        {"value": body.value}, get_client_ip(request),
     )
 
     return ServerSettingResponse.model_validate(setting)

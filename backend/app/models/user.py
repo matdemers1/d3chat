@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import String, Boolean, DateTime, Text, UniqueConstraint, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -23,6 +23,12 @@ class User(Base):
     is_suspended: Mapped[bool] = mapped_column(Boolean, default=False)
     suspended_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ban_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    display_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    avatar_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    bio: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    status_message: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    email_visible: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    preferences: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

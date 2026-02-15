@@ -2,8 +2,11 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useChatStore } from "@/store/chatStore";
 import { useAuthStore } from "@/store/authStore";
+import { useBrandingStore } from "@/store/brandingStore";
 import { api } from "@/api/client";
 import NewDMDialog from "@/components/chat/NewDMDialog";
+import ProfileModal from "@/components/users/ProfileModal";
+import Avatar from "@/components/common/Avatar";
 import type { ChannelMember } from "@/types";
 
 const FE_VERSION = "0.3.0";
@@ -18,8 +21,10 @@ export default function Sidebar() {
   const [newChannelName, setNewChannelName] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [showDMDialog, setShowDMDialog] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [dmNames, setDmNames] = useState<Record<string, string>>({});
   const navigate = useNavigate();
+  const appName = useBrandingStore((s) => s.appName);
   const isAdmin = user?.role === "admin" || user?.role === "superadmin";
 
   // Fetch display names for DM channels
@@ -38,9 +43,11 @@ export default function Sidebar() {
         if (cancelled) return;
         const other = members.find((m) => m.user_id !== user.id);
         if (other) {
-          const displayName = other.is_local
-            ? String(other.username)
-            : `${other.username}@${other.server_domain}`;
+          const displayName = other.display_name
+            ? other.display_name
+            : other.is_local
+              ? String(other.username)
+              : `${other.username}@${other.server_domain}`;
           setDmNames((prev) => ({ ...prev, [ch.id]: displayName }));
         }
       } catch {
@@ -61,17 +68,34 @@ export default function Sidebar() {
 
   return (
     <div className="w-64 bg-gray-900 flex flex-col border-r border-gray-800">
-      <div className="p-4 border-b border-gray-800">
-        <h1 className="text-lg font-bold text-white">d3chat</h1>
+      <div
+        className="p-4 border-b border-gray-800 flex items-center gap-2.5 cursor-pointer hover:bg-gray-800/50 transition-colors"
+        onClick={() => setShowProfileModal(true)}
+      >
         {user && (
-          <p className="text-sm text-gray-400 truncate">{user.username}</p>
+          <Avatar
+            src={user.avatar_url}
+            name={user.display_name || user.username}
+            size="sm"
+          />
         )}
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-bold text-white leading-tight">{appName}</h1>
+          {user && (
+            <p className="text-sm text-gray-400 truncate">
+              {user.display_name || user.username}
+            </p>
+          )}
+          {user?.status_message && (
+            <p className="text-xs text-gray-600 truncate">{user.status_message}</p>
+          )}
+        </div>
       </div>
 
       <div className="p-3 border-b border-gray-800 space-y-2">
         <button
           onClick={() => setShowCreate(!showCreate)}
-          className="w-full py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+          className="w-full py-1.5 text-sm bg-brand hover:brightness-90 text-white rounded transition-colors"
         >
           + New Channel
         </button>
@@ -93,7 +117,7 @@ export default function Sidebar() {
             />
             <button
               onClick={handleCreate}
-              className="px-2 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded"
+              className="px-2 py-1 text-sm bg-brand-accent hover:brightness-90 text-white rounded"
             >
               Add
             </button>
@@ -150,6 +174,9 @@ export default function Sidebar() {
 
       {showDMDialog && (
         <NewDMDialog onClose={() => setShowDMDialog(false)} />
+      )}
+      {showProfileModal && (
+        <ProfileModal onClose={() => setShowProfileModal(false)} />
       )}
     </div>
   );

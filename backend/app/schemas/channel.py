@@ -32,6 +32,8 @@ class ChannelMemberResponse(BaseModel):
     is_local: bool
     role: str
     joined_at: datetime
+    display_name: str | None = None
+    avatar_url: str | None = None
 
 
 class DMCreate(BaseModel):

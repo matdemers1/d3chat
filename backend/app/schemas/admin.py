@@ -129,3 +129,18 @@ class ServerSettingResponse(BaseModel):
 class ServerSettingUpdate(BaseModel):
     value: dict | None = None
     description: str | None = None
+
+
+class ServerSettingCreate(BaseModel):
+    key: str = Field(min_length=1, max_length=128)
+    value: dict | None = None
+    category: str = Field(default="general", max_length=64)
+    description: str | None = None
+
+
+class PublicConfigResponse(BaseModel):
+    app_name: str = "d3chat"
+    app_description: str = "Federated end-to-end encrypted chat"
+    registration_mode: str = "open"
+    brand_primary_color: str = "#3b82f6"
+    brand_accent_color: str = "#10b981"

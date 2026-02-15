@@ -109,8 +109,45 @@ class ApiClient {
     });
   }
 
-  delete(path: string) {
-    return this.request<void>(path, { method: "DELETE" });
+  delete<T = void>(path: string) {
+    return this.request<T>(path, { method: "DELETE" });
+  }
+
+  async upload<T>(path: string, formData: FormData): Promise<T> {
+    const headers: Record<string, string> = {};
+    if (this.accessToken) {
+      headers["Authorization"] = `Bearer ${this.accessToken}`;
+    }
+
+    const response = await fetch(`${API_URL}${path}`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    if (response.status === 401 && this.refreshToken) {
+      const refreshed = await this.tryRefresh();
+      if (refreshed) {
+        headers["Authorization"] = `Bearer ${this.accessToken}`;
+        const retry = await fetch(`${API_URL}${path}`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (retry.ok) {
+          return retry.json();
+        }
+      }
+      this.onUnauthorized?.();
+      throw new Error("Unauthorized");
+    }
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
   }
 }
 
