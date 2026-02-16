@@ -54,7 +54,7 @@ async def ensure_default_admin(session):
     result = await session.execute(
         select(User).where(User.role == "superadmin", User.is_local == True)
     )
-    if result.scalar_one_or_none():
+    if result.scalars().first():
         return  # A superadmin already exists
 
     admin_user = User(
