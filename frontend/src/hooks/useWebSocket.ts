@@ -13,25 +13,16 @@ export function useWebSocket() {
   const setTyping = useChatStore((s) => s.setTyping);
 
   useEffect(() => {
-    console.log("[useWebSocket] Setting up WS handler");
     const unsubscribe = wsClient.subscribe((msg: WsMessage) => {
-      console.log("[useWebSocket] Handling:", msg.type);
       switch (msg.type) {
         case "channel.new": {
           const channel = msg.channel as Channel;
-          console.log("[useWebSocket] channel.new:", channel.id, channel);
           const state = useChatStore.getState();
-          // Add channel to store if not already present
           if (!state.channels.some((c) => c.id === channel.id)) {
-            console.log("[useWebSocket] Adding new channel to store");
             useChatStore.setState({
               channels: [...state.channels, channel],
             });
-          } else {
-            console.log("[useWebSocket] Channel already in store");
           }
-          // Subscribe WS to the new channel for real-time messages
-          console.log("[useWebSocket] Sending subscribe for channel:", channel.id);
           wsClient.send({
             type: "subscribe",
             channel_id: channel.id,
@@ -40,30 +31,13 @@ export function useWebSocket() {
         }
         case "message.new": {
           const message = msg.message as Message;
-          console.log(
-            "[useWebSocket] message.new:",
-            "id=", message.id,
-            "channel=", message.channel_id,
-            "sender=", message.sender_id,
-            "protocol_version=", message.protocol_version,
-            "sender_device_id=", message.sender_device_id,
-            "content_len=", message.content?.length
-          );
 
           if (message.protocol_version === 2) {
-            // Read channels from store at call time to avoid stale closure
             const channels = useChatStore.getState().channels;
             const channel = channels.find(
               (c) => c.id === message.channel_id
             );
-            // Determine encryption type — fall back to "sender_keys" for groups
-            // if channel isn't in store yet (race with channel.new)
             const encryptionType = channel?.encryption_type ?? "sender_keys";
-            console.log(
-              "[useWebSocket] Decrypting message:",
-              "encryptionType=", encryptionType,
-              "channelFound=", !!channel
-            );
 
             decryptFromChannel(
               message.channel_id,
@@ -72,12 +46,11 @@ export function useWebSocket() {
               message.sender_device_id
             )
               .then((plaintext) => {
-                console.log("[useWebSocket] Decryption success, plaintext_len=", plaintext.length);
                 cacheMessagePlaintext(message.id, plaintext).catch(console.error);
                 addMessage({ ...message, content: plaintext });
               })
               .catch((err) => {
-                console.error("[useWebSocket] Decryption FAILED:", err);
+                console.error("[decrypt] Failed:", err);
                 addMessage({
                   ...message,
                   content: "[Unable to decrypt]",
@@ -124,7 +97,6 @@ export function useWebSocket() {
         }
         case "sender_key.new": {
           const channelId = msg.channel_id as string;
-          console.log("[useWebSocket] sender_key.new for channel:", channelId);
           fetchAndStoreSenderKeys(channelId).catch(console.error);
           break;
         }
@@ -135,9 +107,6 @@ export function useWebSocket() {
             replenishOneTimeKeys(deviceId).catch(console.error);
           }
           break;
-        }
-        default: {
-          console.log("[useWebSocket] Unhandled message type:", msg.type);
         }
       }
     });

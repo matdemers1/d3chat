@@ -125,7 +125,6 @@ export async function decryptWithSenderKey(
   let stored = await getSenderKey(channelId, senderDeviceId);
   if (!stored) {
     // Try fetching sender keys from the server
-    console.log(`[senderKey] No local key for ${senderDeviceId}, fetching from server...`);
     const keys = await api.get<SenderKeyData[]>(
       `/keys/channels/${channelId}/sender-keys`
     );

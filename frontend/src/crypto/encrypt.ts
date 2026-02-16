@@ -25,7 +25,6 @@ export async function encryptForChannel(
   plaintext: string,
   deviceId: string
 ): Promise<string> {
-  console.log(`[encrypt] encryptForChannel: channel=${channelId}, type=${encryptionType}, deviceId=${deviceId}`);
   if (encryptionType === "x3dh") {
     return encryptForDM(channelId, plaintext, deviceId);
   }
@@ -41,7 +40,6 @@ export async function decryptFromChannel(
   ciphertext: string,
   senderDeviceId: string | null,
 ): Promise<string> {
-  console.log(`[encrypt] decryptFromChannel: channel=${channelId}, type=${encryptionType}, senderDevice=${senderDeviceId}, ciphertext_len=${ciphertext?.length}`);
   if (encryptionType === "x3dh") {
     return decryptFromDM(channelId, ciphertext);
   }
@@ -63,11 +61,8 @@ async function encryptForDM(
   deviceId: string
 ): Promise<string> {
   let sessionKey = await getSessionKey(channelId);
-  console.log(`[encrypt] encryptForDM: channel=${channelId}, hasSessionKey=${!!sessionKey}`);
 
   if (!sessionKey) {
-    // Need to establish X3DH session
-    console.log("[encrypt] No session key, establishing X3DH as initiator...");
     sessionKey = await establishDMSession(channelId, deviceId);
   }
 
@@ -79,17 +74,13 @@ async function decryptFromDM(
   ciphertext: string
 ): Promise<string> {
   let sessionKey = await getSessionKey(channelId);
-  console.log(`[encrypt] decryptFromDM: channel=${channelId}, hasSessionKey=${!!sessionKey}`);
 
   if (!sessionKey) {
-    // We're the responder — try to establish the session from X3DH setup data
     const deviceId = localStorage.getItem("device_id");
-    console.log(`[encrypt] No session key, establishing X3DH as responder... deviceId=${deviceId}`);
     if (!deviceId) {
       throw new Error("No device ID. Cannot establish DM session.");
     }
     sessionKey = await establishDMSessionAsResponder(channelId, deviceId);
-    console.log("[encrypt] Responder session established successfully");
   }
 
   return aesDecrypt(ciphertext, sessionKey);
@@ -99,8 +90,6 @@ async function establishDMSession(
   channelId: string,
   deviceId: string
 ): Promise<CryptoKey> {
-  console.log(`[encrypt] establishDMSession (initiator): channel=${channelId}, device=${deviceId}`);
-
   // Get the other user's info from channel members
   const members = await api.get<
     Array<{ user_id: string; username: string; role: string }>
@@ -112,13 +101,11 @@ async function establishDMSession(
   if (!otherMember) {
     throw new Error("Cannot find other DM participant");
   }
-  console.log(`[encrypt] Other DM member: userId=${otherMember.user_id}, username=${otherMember.username}`);
 
   // Fetch their key bundles
   const bundles = await api.get<KeyBundleType[]>(
     `/keys/${otherMember.user_id}/bundles`
   );
-  console.log(`[encrypt] Fetched ${bundles.length} key bundle(s) for recipient`);
   if (!bundles.length) {
     throw new Error("Recipient has no key bundles");
   }
@@ -132,13 +119,11 @@ async function establishDMSession(
   if (!identityKeyPair) {
     throw new Error("No identity key pair. Bootstrap keys first.");
   }
-  console.log("[encrypt] Have identity key pair, performing X3DH initiator...");
 
   const { sessionKey, ephemeralPublicKey } = await performX3DHInitiator(
     identityKeyPair,
     bundle
   );
-  console.log("[encrypt] X3DH initiator complete, storing setup data...");
 
   // Export and store X3DH setup data so the responder can derive the same key
   const identityPub = await exportPublicKey(identityKeyPair.publicKey);
@@ -148,10 +133,8 @@ async function establishDMSession(
     ephemeral_public_key: ephemeralPub,
     used_one_time_key: false,
   });
-  console.log("[encrypt] X3DH setup data stored on server");
 
   await saveSessionKey(channelId, sessionKey);
-  console.log("[encrypt] Session key saved to IndexedDB");
   return sessionKey;
 }
 
@@ -163,25 +146,20 @@ async function establishDMSessionAsResponder(
   channelId: string,
   deviceId: string
 ): Promise<CryptoKey> {
-  console.log(`[encrypt] establishDMSessionAsResponder: channel=${channelId}, device=${deviceId}`);
-
   // Fetch the X3DH setup data stored by the initiator
   const setup = await api.get<X3DHSetupData>(
     `/keys/channels/${channelId}/x3dh-setup`
   );
-  console.log(`[encrypt] Fetched X3DH setup: initiator_identity_key=${setup.initiator_identity_key?.slice(0, 20)}..., ephemeral=${setup.ephemeral_public_key?.slice(0, 20)}...`);
 
   const identityKeyPair = await getIdentityKeyPair(deviceId);
   if (!identityKeyPair) {
     throw new Error("No identity key pair. Bootstrap keys first.");
   }
-  console.log("[encrypt] Have identity key pair");
 
   const signedPreKeyPair = await getSignedPreKey(deviceId);
   if (!signedPreKeyPair) {
     throw new Error("No signed pre-key. Bootstrap keys first.");
   }
-  console.log("[encrypt] Have signed pre-key pair, performing X3DH responder...");
 
   const sessionKey = await performX3DHResponder(
     identityKeyPair,
@@ -190,10 +168,8 @@ async function establishDMSessionAsResponder(
     setup.ephemeral_public_key,
     undefined // OTP support can be added later
   );
-  console.log("[encrypt] X3DH responder complete");
 
   await saveSessionKey(channelId, sessionKey);
-  console.log("[encrypt] Session key saved to IndexedDB");
   return sessionKey;
 }
 

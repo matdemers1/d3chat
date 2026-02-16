@@ -23,13 +23,10 @@ import {
  * 4. Save all keys to IndexedDB
  */
 export async function bootstrapDeviceKeys(deviceId: string): Promise<void> {
-  console.log(`[bootstrap] bootstrapDeviceKeys: deviceId=${deviceId}`);
   const existing = await getIdentityKeyPair(deviceId);
   if (existing) {
-    console.log("[bootstrap] Already bootstrapped, skipping");
     return; // Already bootstrapped
   }
-  console.log("[bootstrap] No existing keys, generating new key material...");
 
   // Generate identity ECDH key pair
   const identityKeyPair = await generateECDHKeyPair();
@@ -72,7 +69,6 @@ export async function bootstrapDeviceKeys(deviceId: string): Promise<void> {
   await saveSigningKeyPair(deviceId, signingKeyPair);
   await saveSignedPreKey(deviceId, signedPreKeyPair);
   await saveOneTimePreKeys(deviceId, otpKeyPairs);
-  console.log("[bootstrap] Keys generated, uploaded, and saved to IndexedDB");
 }
 
 /**

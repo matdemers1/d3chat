@@ -20,38 +20,32 @@ class WebSocketClient {
       const { ticket } = await api.post<{ ticket: string }>(
         "/auth/ws-ticket"
       );
-      console.log("[WS] Connecting with ticket...");
       this.ws = new WebSocket(`${WS_URL}?ticket=${ticket}`);
       this.shouldReconnect = true;
 
       this.ws.onopen = () => {
-        console.log("[WS] Connected");
         this.reconnectDelay = 1000;
       };
 
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data) as WsMessage;
-          console.log("[WS] Received:", data.type, data);
           this.handlers.forEach((h) => h(data));
         } catch {
-          console.warn("[WS] Malformed message:", event.data);
+          console.warn("[WS] Malformed message");
         }
       };
 
-      this.ws.onclose = (event) => {
-        console.log("[WS] Closed:", event.code, event.reason);
+      this.ws.onclose = () => {
         if (this.shouldReconnect) {
           this.scheduleReconnect();
         }
       };
 
-      this.ws.onerror = (event) => {
-        console.error("[WS] Error:", event);
+      this.ws.onerror = () => {
         this.ws?.close();
       };
-    } catch (err) {
-      console.error("[WS] Connection failed:", err);
+    } catch {
       this.scheduleReconnect();
     }
   }
@@ -68,10 +62,7 @@ class WebSocketClient {
 
   send(data: WsMessage) {
     if (this.ws?.readyState === WebSocket.OPEN) {
-      console.log("[WS] Sending:", data.type, data);
       this.ws.send(JSON.stringify(data));
-    } else {
-      console.warn("[WS] Cannot send, not connected. State:", this.ws?.readyState);
     }
   }
 
@@ -82,7 +73,6 @@ class WebSocketClient {
 
   private scheduleReconnect() {
     if (this.reconnectTimer) return;
-    console.log(`[WS] Reconnecting in ${this.reconnectDelay}ms...`);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.reconnectDelay = Math.min(
