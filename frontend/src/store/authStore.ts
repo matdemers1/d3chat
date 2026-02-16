@@ -13,7 +13,7 @@ interface AuthState {
   register: (
     username: string,
     password: string,
-    deviceName?: string
+    options?: { email?: string; displayName?: string; deviceName?: string }
   ) => Promise<void>;
   login: (
     username: string,
@@ -50,14 +50,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: false,
   error: null,
 
-  register: async (username, password, deviceName = "web") => {
+  register: async (username, password, options = {}) => {
     set({ isLoading: true, error: null });
     try {
-      const data = await api.post<TokenResponse>("/auth/register", {
+      const { email, displayName, deviceName = "web" } = options;
+      const payload: Record<string, string> = {
         username,
         password,
         device_name: deviceName,
-      });
+      };
+      if (email) payload.email = email;
+      if (displayName) payload.display_name = displayName;
+      const data = await api.post<TokenResponse>("/auth/register", payload);
       api.setTokens(data.access_token, data.refresh_token);
       localStorage.setItem("access_token", data.access_token);
       localStorage.setItem("refresh_token", data.refresh_token);

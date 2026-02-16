@@ -69,6 +69,7 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     user = User(
         username=body.username,
         email=body.email,
+        display_name=body.display_name,
         password_hash=hash_password(body.password),
         server_domain=settings.server_domain,
         is_local=True,
