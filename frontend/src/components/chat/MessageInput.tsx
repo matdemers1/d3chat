@@ -1,6 +1,8 @@
-import { useState, type FormEvent, type KeyboardEvent } from "react";
+import { useState, useRef, useCallback, type FormEvent, type KeyboardEvent } from "react";
 import { useChatStore } from "@/store/chatStore";
 import { wsClient } from "@/api/ws";
+
+const TYPING_THROTTLE_MS = 2000;
 
 interface Props {
   channelId: string;
@@ -10,6 +12,14 @@ export default function MessageInput({ channelId }: Props) {
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
   const sendMessage = useChatStore((s) => s.sendMessage);
+  const lastTypingSentRef = useRef(0);
+
+  const sendTypingStart = useCallback((chId: string) => {
+    const now = Date.now();
+    if (now - lastTypingSentRef.current < TYPING_THROTTLE_MS) return;
+    lastTypingSentRef.current = now;
+    wsClient.send({ type: "typing.start", channel_id: chId });
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -25,6 +35,7 @@ export default function MessageInput({ channelId }: Props) {
     } finally {
       setSending(false);
     }
+    lastTypingSentRef.current = 0;
     wsClient.send({ type: "typing.stop", channel_id: channelId });
   };
 
@@ -38,8 +49,9 @@ export default function MessageInput({ channelId }: Props) {
   const handleInput = (value: string) => {
     setContent(value);
     if (value) {
-      wsClient.send({ type: "typing.start", channel_id: channelId });
+      sendTypingStart(channelId);
     } else {
+      lastTypingSentRef.current = 0;
       wsClient.send({ type: "typing.stop", channel_id: channelId });
     }
   };
