@@ -7,7 +7,7 @@ import {
   fetchAndStoreSenderKeys,
 } from "@/crypto/encrypt";
 import { cacheMessagePlaintext, getCachedPlaintext } from "@/crypto/keyStore";
-import type { Channel, Message, MessagePage, ChannelMember, WsMessage } from "@/types";
+import type { Channel, Message, MessagePage, ChannelMember, WsMessage, ReplySnippet } from "@/types";
 
 interface ChatState {
   channels: Channel[];
@@ -16,14 +16,17 @@ interface ChatState {
   members: Record<string, ChannelMember[]>;
   hasMore: Record<string, boolean>;
   typingUsers: Record<string, Set<string>>;
+  replyingTo: Message | null;
   error: string | null;
   clearError: () => void;
+  setReplyingTo: (message: Message) => void;
+  clearReplyingTo: () => void;
   loadChannels: () => Promise<void>;
   setActiveChannel: (id: string) => void;
   loadMessages: (channelId: string) => Promise<void>;
   loadMoreMessages: (channelId: string) => Promise<void>;
   loadMembers: (channelId: string) => Promise<void>;
-  sendMessage: (channelId: string, content: string) => Promise<void>;
+  sendMessage: (channelId: string, content: string, attachmentIds?: string[]) => Promise<void>;
   createChannel: (name: string) => Promise<Channel>;
   createDM: (userId: string) => Promise<Channel>;
   joinChannel: (channelId: string) => Promise<void>;
@@ -51,17 +54,32 @@ function getChannel(channels: Channel[], channelId: string): Channel | undefined
   return channels.find((c) => c.id === channelId);
 }
 
+async function decryptReplySnippet(
+  snippet: ReplySnippet | null
+): Promise<ReplySnippet | null> {
+  if (!snippet) return null;
+  if (snippet.protocol_version !== 2) return snippet;
+  const cached = await getCachedPlaintext(snippet.id);
+  if (cached !== undefined) {
+    return { ...snippet, content: cached };
+  }
+  return { ...snippet, content: "[Encrypted message]" };
+}
+
 async function decryptMessage(
   msg: Message,
   channel: Channel | undefined
 ): Promise<Message> {
-  if (msg.protocol_version !== 2 || !channel) return msg;
+  const decryptedReplyTo = await decryptReplySnippet(msg.reply_to);
+  const withReply = decryptedReplyTo !== msg.reply_to ? { ...msg, reply_to: decryptedReplyTo } : msg;
+
+  if (msg.protocol_version !== 2 || !channel) return withReply;
 
   // Check plaintext cache first (handles re-decryption after page reload,
   // and is required for own messages where the sender key has already ratcheted)
   const cached = await getCachedPlaintext(msg.id);
   if (cached !== undefined) {
-    return { ...msg, content: cached };
+    return { ...withReply, content: cached };
   }
 
   // For own messages in sender_keys channels, the local chain key has already
@@ -79,12 +97,12 @@ async function decryptMessage(
     );
     // Cache for future loads
     await cacheMessagePlaintext(msg.id, plaintext);
-    return { ...msg, content: plaintext };
+    return { ...withReply, content: plaintext };
   } catch {
     if (isOwnMessage) {
-      return { ...msg, content: "[Your message - cache expired]" };
+      return { ...withReply, content: "[Your message - cache expired]" };
     }
-    return { ...msg, content: "[Unable to decrypt]" };
+    return { ...withReply, content: "[Unable to decrypt]" };
   }
 }
 
@@ -107,8 +125,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   members: {},
   hasMore: {},
   typingUsers: {},
+  replyingTo: null,
   error: null,
   clearError: () => set({ error: null }),
+  setReplyingTo: (message) => set({ replyingTo: message }),
+  clearReplyingTo: () => set({ replyingTo: null }),
 
   loadChannels: async () => {
     const channels = await api.get<Channel[]>("/channels");
@@ -175,9 +196,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
   },
 
-  sendMessage: async (channelId, content) => {
+  sendMessage: async (channelId, content, attachmentIds) => {
     const deviceId = getDeviceId();
     const channel = getChannel(get().channels, channelId);
+    const replyToId = get().replyingTo?.id ?? null;
+    const attIds = attachmentIds?.length ? attachmentIds : undefined;
 
     if (channel && deviceId) {
       try {
@@ -191,11 +214,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
           content: encrypted,
           protocol_version: 2,
           sender_device_id: deviceId,
+          ...(replyToId && { reply_to_id: replyToId }),
+          ...(attIds && { attachment_ids: attIds }),
         });
         // Add locally with plaintext (the WS echo has ciphertext we can't re-decrypt)
         // Cache so we can show plaintext on page reload
         cacheMessagePlaintext(msg.id, content).catch(console.error);
         get().addMessage({ ...msg, content });
+        get().clearReplyingTo();
         return;
       } catch (err) {
         const message = err instanceof Error ? err.message : "Send failed";
@@ -213,8 +239,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const msg = await api.post<Message>(`/channels/${channelId}/messages`, {
         content,
+        ...(replyToId && { reply_to_id: replyToId }),
+        ...(attIds && { attachment_ids: attIds }),
       });
       get().addMessage(msg);
+      get().clearReplyingTo();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Send failed";
       if (message.includes("429") || message.includes("Rate limit")) {

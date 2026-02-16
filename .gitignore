@@ -38,3 +38,9 @@ docker-compose.override.yml
 htmlcov/
 .coverage
 coverage/
+
+# Uploads (user-generated content)
+backend/uploads/
+
+# TypeScript build info
+*.tsbuildinfo

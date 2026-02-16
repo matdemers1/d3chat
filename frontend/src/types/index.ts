@@ -51,6 +51,28 @@ export interface Channel {
   created_at: string;
 }
 
+export interface Attachment {
+  id: string;
+  message_id: string | null;
+  channel_id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  url: string;
+  thumbnail_url: string | null;
+  width: number | null;
+  height: number | null;
+  created_at: string;
+}
+
+export interface ReplySnippet {
+  id: string;
+  sender_id: string | null;
+  content: string;
+  content_type: string;
+  protocol_version: number;
+}
+
 export interface Message {
   id: string;
   channel_id: string;
@@ -59,6 +81,9 @@ export interface Message {
   content: string;
   content_type: string;
   protocol_version: number;
+  reply_to_id: string | null;
+  reply_to: ReplySnippet | null;
+  attachments: Attachment[];
   edited_at: string | null;
   created_at: string;
 }

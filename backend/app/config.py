@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     # Uploads
     upload_dir: str = "uploads"
     max_avatar_size_bytes: int = 2_097_152  # 2 MB
+    max_file_size_bytes: int = 10_485_760  # 10 MB
 
     # Rate limiting
     rate_limit_per_minute: int = 300

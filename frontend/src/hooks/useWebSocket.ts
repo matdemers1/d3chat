@@ -2,9 +2,9 @@ import { useEffect } from "react";
 import { wsClient } from "@/api/ws";
 import { useChatStore } from "@/store/chatStore";
 import { decryptFromChannel, fetchAndStoreSenderKeys } from "@/crypto/encrypt";
-import { cacheMessagePlaintext } from "@/crypto/keyStore";
+import { cacheMessagePlaintext, getCachedPlaintext } from "@/crypto/keyStore";
 import { replenishOneTimeKeys } from "@/crypto/bootstrap";
-import type { Channel, Message, WsMessage } from "@/types";
+import type { Channel, Message, ReplySnippet, WsMessage } from "@/types";
 
 export function useWebSocket() {
   const addMessage = useChatStore((s) => s.addMessage);
@@ -32,6 +32,15 @@ export function useWebSocket() {
         case "message.new": {
           const message = msg.message as Message;
 
+          // Decrypt reply_to snippet if encrypted
+          const decryptReplySnippet = async (snippet: ReplySnippet | null): Promise<ReplySnippet | null> => {
+            if (!snippet) return null;
+            if (snippet.protocol_version !== 2) return snippet;
+            const cached = await getCachedPlaintext(snippet.id);
+            if (cached !== undefined) return { ...snippet, content: cached };
+            return { ...snippet, content: "[Encrypted message]" };
+          };
+
           if (message.protocol_version === 2) {
             const channels = useChatStore.getState().channels;
             const channel = channels.find(
@@ -45,21 +54,26 @@ export function useWebSocket() {
               message.content,
               message.sender_device_id
             )
-              .then((plaintext) => {
+              .then(async (plaintext) => {
                 cacheMessagePlaintext(message.id, plaintext).catch(console.error);
-                addMessage({ ...message, content: plaintext });
+                const replyTo = await decryptReplySnippet(message.reply_to);
+                addMessage({ ...message, content: plaintext, reply_to: replyTo });
               })
-              .catch((err) => {
+              .catch(async (err) => {
                 console.error("[decrypt] Failed:", err);
+                const replyTo = await decryptReplySnippet(message.reply_to);
                 addMessage({
                   ...message,
                   content: "[Unable to decrypt]",
+                  reply_to: replyTo,
                 });
               });
             break;
           }
 
-          addMessage(message);
+          decryptReplySnippet(message.reply_to).then((replyTo) => {
+            addMessage({ ...message, reply_to: replyTo });
+          });
           break;
         }
         case "message.edit": {

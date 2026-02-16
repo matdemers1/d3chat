@@ -10,6 +10,7 @@ from app.models.session import Session
 from app.models.audit_log import AuditLog
 from app.models.server_settings import ServerSettings
 from app.models.analytics import AnalyticsDaily
+from app.models.attachment import Attachment
 
 __all__ = [
     "User",
@@ -24,4 +25,5 @@ __all__ = [
     "AuditLog",
     "ServerSettings",
     "AnalyticsDaily",
+    "Attachment",
 ]

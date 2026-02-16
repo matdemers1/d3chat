@@ -10,7 +10,7 @@ import json
 from app.config import get_settings
 from app.redis_client import redis_client
 from app.database import get_db, get_engine, get_session_factory
-from app.routers import admin, auth, users, devices, channels, messages, keys, avatars
+from app.routers import admin, auth, users, devices, channels, messages, keys, avatars, attachments
 from app.websocket.router import router as ws_router
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.federation.identity import init_server_identity, get_public_key_b64
@@ -89,6 +89,7 @@ async def lifespan(app: FastAPI):
     import os
     settings = get_settings()
     os.makedirs(os.path.join(settings.upload_dir, "avatars"), exist_ok=True)
+    os.makedirs(os.path.join(settings.upload_dir, "attachments"), exist_ok=True)
     yield
     # Shutdown
     logger.info(f"d3chat backend v{APP_VERSION} shutting down")
@@ -130,6 +131,7 @@ def create_app() -> FastAPI:
     app.include_router(keys.router, prefix="/api/v1/keys", tags=["keys"])
     app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
     app.include_router(avatars.router, prefix="/api/v1/avatars", tags=["avatars"])
+    app.include_router(attachments.router, prefix="/api/v1", tags=["attachments"])
 
     # WebSocket
     app.include_router(ws_router)
